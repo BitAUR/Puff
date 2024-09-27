@@ -24,6 +24,8 @@ RUN mkdir -p /app/data
 
 COPY ./templates /app/templates
 
+COPY ./static /app/static
+
 EXPOSE 8080
 
 # 运行应用
