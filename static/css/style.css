@@ -1,0 +1,47 @@
+body {
+    padding-top: 20px;
+    background-color: #f8f9fa;
+}
+
+.navbar {
+    margin-bottom: 20px;
+}
+
+h1, h2 {
+    color: #007bff;
+    margin-bottom: 20px;
+}
+
+.table {
+    background-color: white;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.table th {
+    background-color: #007bff;
+    color: white;
+}
+
+#refresh-status-btn {
+    margin-bottom: 10px;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}

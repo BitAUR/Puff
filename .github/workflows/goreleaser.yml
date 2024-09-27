@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' 
+
+jobs:
+  release:
+    name: GoReleaser
+    runs-on: ubuntu-latest
+
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'  # 设定需要的 Go 版本
+      -
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          # either 'goreleaser' (default) or 'goreleaser-pro'
+          distribution: goreleaser
+          # 'latest', 'nightly', or a semver
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITEA_TOKEN }}  # 用于认证发布
+

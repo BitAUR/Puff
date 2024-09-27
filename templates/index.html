@@ -1,0 +1,64 @@
+{{define "index_content"}}
+<div class="space-y-8"> <!-- 增加整体垂直间距 -->
+    <h1 class="text-3xl font-bold text-center">域名管理</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8"> <!-- 增加列间距 -->
+        <div class="flex flex-col justify-center space-y-4"> <!-- 修改这里 -->
+            <h2 class="text-2xl font-semibold">添加域名</h2>
+            <form id="add-domain-form" class="w-full">
+                <div class="join w-full flex flex-col sm:flex-row">
+                    <input type="text" id="new-domain" class="input input-bordered join-item flex-grow" placeholder="输入域名" required>
+                    <button type="submit" class="btn join-item mt-2 sm:mt-0">添加</button>
+                </div>
+            </form>
+        </div>
+        <div class="flex flex-col justify-center space-y-4"> <!-- 增加垂直间距 -->
+            <h2 class="text-2xl font-semibold">域名列表</h2>
+            <div class="overflow-x-auto">
+                <table id="domain-list" class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th >域名</th>
+                            <th >操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Domains}}
+                        <tr>
+                            <td >{{.}}</td>
+                            <td >
+                                <button class="btn btn-sm delete-domain" data-domain="{{.}}">删除</button>
+                            </td>
+                        </tr>
+                        {{else}}
+                        <tr>
+                            <td colspan="2" >暂无域名</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-4"> <!-- 增加垂直间距 -->
+        <h2 class="text-2xl font-semibold">域名状态</h2>
+        <button id="refresh-status-btn" class="btn mb-4">刷新状态</button>
+        <div class="overflow-x-auto">
+            <table id="domain-status-list" class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>域名</th>
+                        <th class="cursor-pointer" data-sort="status">状态 ↕</th>
+                        <th class="cursor-pointer" data-sort="lastChecked">最后检查时间 ↕</th>
+                        <th class="cursor-pointer" data-sort="monitorStatus">监控状态 ↕</th>
+                    </tr>
+                </thead>
+                <tbody id="status-table-body">
+                    <!-- 表格内容将由 JavaScript 动态填充 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{{end}}

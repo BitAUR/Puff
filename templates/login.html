@@ -1,0 +1,31 @@
+{{define "login_content"}}
+<div class="flex justify-center items-center h-[50vh] min-h-[400px] bg-base-200">
+    <div class="card w-96 bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title justify-center text-2xl mb-4">登录</h2>
+            {{if .error}}
+            <div class="alert alert-error mb-4">
+                <span>{{.error}}</span>
+            </div>
+            {{end}}
+            <form action="/login" method="POST" class="space-y-4">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">用户名</span>
+                    </label>
+                    <input type="text" name="username" placeholder="用户名" class="input input-bordered" required>
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">密码</span>
+                    </label>
+                    <input type="password" name="password" placeholder="密码" class="input input-bordered" required>
+                </div>
+                <div class="form-control mt-6">
+                    <button class="btn btn-primary">登录</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{end}}
