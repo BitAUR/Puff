@@ -2,7 +2,9 @@
     <h1>Puff</h1>
 <div align="center">
 ![GitHub repo size](https://img.shields.io/github/repo-size/bitaur/puff)
+    
 ![GitHub Repo stars](https://img.shields.io/github/stars/bitaur/puff)
+
 ![GitHub all releases](https://img.shields.io/github/downloads/bitaur/puff/total)
 
 </div>
