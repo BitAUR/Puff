@@ -36,7 +36,7 @@ archives:
     files:
       - LICENSE
       - README.md
-      - 'templates/**/*'
+      - 'templates/*'
       - 'static/**/*'
 checksum:
   name_template: 'checksums.txt'
