@@ -7,9 +7,9 @@
 ![GitHub all releases](https://img.shields.io/github/downloads/bitaur/puff/total)
 
 </div>
-    <p>使用 腾讯X5 WebView 开发的电视直播App</p>
+    <p>开源、快速、便捷、基于Go的域名监控程序。</p>
 </div>
-    <p>原理：目前很多电视台都会在自己的网站上有直播，软件会加载直播网页，找到video标签自动全屏。</p>
+    <p>原理：通过 Whois 通过字段进行判断域名状态。</p>
 
 <img src="https://s2.loli.net/2024/10/01/9sfwrgutUqOaAxd.png"/>
 
