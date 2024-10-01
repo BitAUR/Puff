@@ -1,8 +1,8 @@
 package auth
 
 import (
+	"Puff/internal/config"
 	"net/http"
-	"os"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -17,6 +17,9 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		// 更新会话，刷新过期时间
+		session.Set("user", user)
+		session.Save()
 		c.Next()
 	}
 }
@@ -25,7 +28,18 @@ func LoginHandler(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
-	if username == os.Getenv("AUTH_USERNAME") && password == os.Getenv("AUTH_PASSWORD") {
+	// 使用 LoadConfig 获取最新的配置
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "layout.html", gin.H{
+			"title":   "登录",
+			"content": "login",
+			"error":   "无法加载配置",
+		})
+		return
+	}
+
+	if username == cfg.AuthUsername && password == cfg.AuthPassword {
 		session := sessions.Default(c)
 		session.Set("user", username)
 		session.Save()

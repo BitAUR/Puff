@@ -149,6 +149,7 @@ func handleUpdateRecipientEmail(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Recipient email updated successfully"})
 }
+
 func handleGetDomainStatuses(c *gin.Context) {
 	statuses := monitor.GetDomainStatuses()
 	c.JSON(http.StatusOK, statuses)

@@ -11,24 +11,16 @@ import (
 type DomainNotification struct {
 	Domain        string
 	IsFinalNotice bool
+	Status        string
 }
 
 func SendNotification(notifications []DomainNotification, cfg *config.Config) error {
 	auth := smtp.PlainAuth("", cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPServer)
 
 	to := []string{cfg.RecipientEmail}
-	subject := "域名可注册提醒"
+	subject := "域名状态变更提醒"
 
-	var firstNoticeList, finalNoticeList []string
-	for _, n := range notifications {
-		if n.IsFinalNotice {
-			finalNoticeList = append(finalNoticeList, n.Domain)
-		} else {
-			firstNoticeList = append(firstNoticeList, n.Domain)
-		}
-	}
-
-	body := generateEmailBody(firstNoticeList, finalNoticeList)
+	body := generateEmailBody(notifications)
 
 	msg := []byte(fmt.Sprintf("From: %s\r\n"+
 		"To: %s\r\n"+
@@ -47,7 +39,7 @@ func SendNotification(notifications []DomainNotification, cfg *config.Config) er
 	return nil
 }
 
-func generateEmailBody(firstNoticeList, finalNoticeList []string) string {
+func generateEmailBody(notifications []DomainNotification) string {
 	var body strings.Builder
 
 	body.WriteString(`
@@ -66,30 +58,25 @@ func generateEmailBody(firstNoticeList, finalNoticeList []string) string {
 <body>
     <div class="container">
         <div class="header">
-            <h1>域名可注册提醒</h1>
+            <h1>域名状态变更提醒</h1>
         </div>
         <div class="content">
             <p>尊敬的用户，</p>
+            <p>以下域名的状态发生了变化：</p>
+            <ul>
     `)
 
-	if len(firstNoticeList) > 0 {
-		body.WriteString("<p>以下域名首次被检测为可注册：</p><ul>")
-		for _, domain := range firstNoticeList {
-			body.WriteString(fmt.Sprintf("<li>%s</li>", domain))
+	for _, n := range notifications {
+		body.WriteString(fmt.Sprintf("<li>%s: %s", n.Domain, n.Status))
+		if n.IsFinalNotice {
+			body.WriteString(" (最终通知)")
 		}
-		body.WriteString("</ul>")
-	}
-
-	if len(finalNoticeList) > 0 {
-		body.WriteString("<p>以下域名已连续三次被检测为可注册：</p><ul>")
-		for _, domain := range finalNoticeList {
-			body.WriteString(fmt.Sprintf("<li>%s</li>", domain))
-		}
-		body.WriteString("</ul>")
+		body.WriteString("</li>")
 	}
 
 	body.WriteString(fmt.Sprintf(`
-            <p>如果您对这些域名感兴趣，请尽快采取行动进行注册。</p>
+            </ul>
+            <p>如果您对这些域名感兴趣，请尽快采取相应的行动。</p>
             <p>检测时间：%s</p>
         </div>
         <div class="footer">

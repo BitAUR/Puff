@@ -12,12 +12,15 @@ import (
 type DomainStatus struct {
 	Domain            string
 	Registered        bool
+	Redemption        bool
+	PendingDelete     bool
+	ExpirationDate    time.Time
 	LastChecked       time.Time
 	FirstNotifiedAt   time.Time
 	CheckCount        int
-	FinalNoticed      bool
 	NeedsNotification bool
-	IsFinalNotice     bool // 新增字段，表示是否为最终通知
+	IsFinalNotice     bool
+	FinalNoticed      bool // 添加这个字段
 }
 
 var (
@@ -86,33 +89,20 @@ func updateDomainStatus(domain string, registered bool) {
 }
 
 func StartMonitoring(whoisServers map[string]string, cfg *config.Config) {
-	mu.Lock()
-	defer mu.Unlock()
+	startTime := time.Now()
+	log.Printf("开始域名检查，时间：%s", startTime.Format("2006-01-02 15:04:05"))
 
-	stopChan = make(chan struct{})
-	wg.Add(1)
+	domains, err := config.LoadDomainList()
+	if err != nil {
+		log.Printf("加载域名列表失败: %v", err)
+		return
+	}
 
-	go func() {
-		defer wg.Done()
-		ticker := time.NewTicker(time.Duration(cfg.QueryFrequencySeconds) * time.Second)
-		defer ticker.Stop()
+	RefreshAllDomains(domains, whoisServers, cfg)
 
-		// 立即执行一次检查
-		checkAllDomains(cfg)
-
-		for {
-			select {
-			case <-ticker.C:
-				log.Println("定时器触发。开始检查域名。")
-				checkAllDomains(cfg)
-			case <-stopChan:
-				log.Println("收到停止信号，域名监控退出")
-				return
-			}
-		}
-	}()
-
-	log.Println("域名监控已启动并运行中")
+	endTime := time.Now()
+	duration := endTime.Sub(startTime)
+	log.Printf("域名检查完成，时间：%s，耗时：%v", endTime.Format("2006-01-02 15:04:05"), duration)
 }
 
 func WaitForMonitoring() {
@@ -175,7 +165,7 @@ func checkAllDomains(cfg *config.Config) {
 
 func RefreshAllDomains(domains []string, whoisServers map[string]string, cfg *config.Config) {
 	var wg sync.WaitGroup
-	results := make(chan DomainCheckResult, len(domains))
+	results := make(chan whois.DomainStatus, len(domains))
 
 	for _, domain := range domains {
 		wg.Add(1)
@@ -183,13 +173,17 @@ func RefreshAllDomains(domains []string, whoisServers map[string]string, cfg *co
 			defer wg.Done()
 			statusMutex.RLock()
 			status, exists := domainStatuses[d]
-			if exists && status.FinalNoticed {
+			if exists && status.FinalNoticed { // 使用 FinalNoticed 而不是 FinalNotice
 				statusMutex.RUnlock()
 				return
 			}
 			statusMutex.RUnlock()
-			registered, err := checkDomain(d, whoisServers, cfg)
-			results <- DomainCheckResult{Domain: d, Registered: registered, Error: err}
+			result, err := checkDomain(d, whoisServers, cfg)
+			if err != nil {
+				log.Printf("检查域名 %s 错误: %v", d, err)
+				return
+			}
+			results <- result
 		}(domain)
 	}
 
@@ -207,24 +201,62 @@ type DomainCheckResult struct {
 	Error      error
 }
 
-func processResults(results <-chan DomainCheckResult, cfg *config.Config) {
+func processResults(results <-chan whois.DomainStatus, cfg *config.Config) {
 	var notifications []notifier.DomainNotification
 
 	for result := range results {
-		if result.Error != nil {
-			log.Printf("检查域名 %s 错误: %v", result.Domain, result.Error)
-			continue
+		statusMutex.Lock()
+		status, exists := domainStatuses[result.Domain]
+		if !exists {
+			status = &DomainStatus{Domain: result.Domain}
+			domainStatuses[result.Domain] = status
 		}
 
-		statusMutex.RLock()
-		status := domainStatuses[result.Domain]
+		prevStatus := *status // 保存之前的状态
+
+		status.Registered = result.Registered
+		status.Redemption = result.Redemption
+		status.PendingDelete = result.PendingDelete
+		status.ExpirationDate = result.ExpirationDate
+		status.LastChecked = time.Now()
+
+		statusChanged := !status.Registered || status.Redemption || status.PendingDelete
+
+		if statusChanged {
+			if status.FirstNotifiedAt.IsZero() {
+				status.FirstNotifiedAt = time.Now()
+				status.CheckCount = 1
+				status.NeedsNotification = true
+				log.Printf("域名 %s 状态首次变化，将发送第一次通知", status.Domain)
+			} else {
+				status.CheckCount++
+				log.Printf("域名 %s 状态变化次数: %d", status.Domain, status.CheckCount)
+				if status.CheckCount == 3 {
+					status.NeedsNotification = true
+					status.IsFinalNotice = true
+					log.Printf("域名 %s 将发送最终通知", status.Domain)
+				} else {
+					status.NeedsNotification = false
+				}
+			}
+		} else if prevStatus.Registered != status.Registered ||
+			prevStatus.Redemption != status.Redemption ||
+			prevStatus.PendingDelete != status.PendingDelete {
+			status.NeedsNotification = false
+			status.IsFinalNotice = false
+			status.FirstNotifiedAt = time.Time{}
+			status.CheckCount = 0
+		}
+
 		if status.NeedsNotification {
 			notifications = append(notifications, notifier.DomainNotification{
-				Domain:        result.Domain,
+				Domain:        status.Domain,
 				IsFinalNotice: status.IsFinalNotice,
+				Status:        getDomainStatusString(status),
 			})
 		}
-		statusMutex.RUnlock()
+
+		statusMutex.Unlock()
 	}
 
 	if len(notifications) > 0 {
@@ -236,32 +268,34 @@ func processResults(results <-chan DomainCheckResult, cfg *config.Config) {
 	}
 }
 
-func checkDomain(domain string, whoisServers map[string]string, cfg *config.Config) (bool, error) {
-	statusMutex.RLock()
-	status, exists := domainStatuses[domain]
-	if exists && status.FinalNoticed {
-		statusMutex.RUnlock()
-		log.Printf("域名 %s 已收到最终通知。停止查询。", domain)
-		return true, nil // 返回 true 以防止进一步处理
-	}
-	statusMutex.RUnlock()
-
+func checkDomain(domain string, whoisServers map[string]string, cfg *config.Config) (whois.DomainStatus, error) {
 	tld := whois.GetTLD(domain)
 	whoisServer, ok := whoisServers[tld]
 	if !ok {
 		log.Printf("未找到域名 %s 的 Whois 服务器", domain)
-		return false, nil
+		return whois.DomainStatus{}, nil
 	}
 
-	registered, err := whois.QueryDomain(domain, whoisServer)
+	status, err := whois.QueryDomain(domain, whoisServer)
 	if err != nil {
 		log.Printf("查询域名 %s 时出错：%v", domain, err)
-		return false, err
+		return whois.DomainStatus{}, err
 	}
 
-	log.Printf("已检查域名 %s。注册状态：%v", domain, registered)
-	updateDomainStatus(domain, registered)
-	return registered, nil
+	logDomainStatus(domain, status)
+	return status, nil
+}
+
+func logDomainStatus(domain string, status whois.DomainStatus) {
+	if !status.Registered {
+		log.Printf("域名 %s 状态: 可注册", domain)
+	} else if status.PendingDelete {
+		log.Printf("域名 %s 状态: 待删除", domain)
+	} else if status.Redemption {
+		log.Printf("域名 %s 状态: 赎回期", domain)
+	} else {
+		log.Printf("域名 %s 状态: 已注册", domain)
+	}
 }
 
 func resetNotificationFlags(notifications []notifier.DomainNotification) {
@@ -271,8 +305,9 @@ func resetNotificationFlags(notifications []notifier.DomainNotification) {
 		if status, exists := domainStatuses[n.Domain]; exists {
 			status.NeedsNotification = false
 			if status.IsFinalNotice {
-				status.FinalNoticed = true
-				status.IsFinalNotice = false // 重置这个标志，因为最终通知已经发送
+				status.FirstNotifiedAt = time.Time{}
+				status.CheckCount = 0
+				status.IsFinalNotice = false
 			}
 		}
 	}
@@ -287,6 +322,7 @@ func GetDomainStatuses() []DomainStatus {
 	}
 	return statuses
 }
+
 func UpdateDomainList(domains []string) {
 	statusMutex.Lock()
 	defer statusMutex.Unlock()
@@ -313,4 +349,16 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func getDomainStatusString(status *DomainStatus) string {
+	if !status.Registered {
+		return "可注册"
+	} else if status.PendingDelete {
+		return "待删除"
+	} else if status.Redemption {
+		return "赎回期"
+	} else {
+		return "已注册"
+	}
 }

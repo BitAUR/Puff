@@ -2,7 +2,9 @@ package web
 
 import (
 	"Puff/internal/auth"
-	"os"
+	"Puff/internal/config"
+	"strconv"
+	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -13,8 +15,20 @@ func StartServer() error {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
+	// 使用 LoadConfig 获取最新的配置
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return err
+	}
+
 	// 设置 session 中间件
-	store := cookie.NewStore([]byte(os.Getenv("SESSION_SECRET")))
+	store := cookie.NewStore([]byte(cfg.SessionSecret))
+	store.Options(sessions.Options{
+		MaxAge:   int(2 * time.Hour.Seconds()), // 设置会话最大存活时间为2小时
+		Path:     "/",
+		Secure:   false, // 如果使用HTTPS，设置为true
+		HttpOnly: true,
+	})
 	r.Use(sessions.Sessions("mysession", store))
 
 	r.LoadHTMLGlob("templates/*")
@@ -52,7 +66,7 @@ func StartServer() error {
 		authorized.POST("/api/settings", handleAPISettings)
 	}
 
-	return r.Run(":" + os.Getenv("WEB_PORT"))
+	return r.Run(":" + strconv.Itoa(cfg.WebPort))
 }
 
 func handleLogin(c *gin.Context) {

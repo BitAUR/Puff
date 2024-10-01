@@ -1,44 +1,3 @@
-function updateDomainStatusList(statuses) {
-    const statusTableBody = document.getElementById('status-table-body');
-    if (!statusTableBody) return;
-
-    statusTableBody.innerHTML = '';
-    statuses.forEach(status => {
-        const row = document.createElement('tr');
-        let registeredStatus, lastCheckedTime, monitorStatus;
-
-        if (new Date(status.LastChecked).getFullYear() === 1) {
-            // 处理新添加的域名
-            registeredStatus = '未查询';
-            lastCheckedTime = '/';
-            monitorStatus = '等待监控';
-        } else {
-            registeredStatus = status.Registered ? '已注册' : '可注册';
-            lastCheckedTime = new Date(status.LastChecked).toLocaleString();
-            monitorStatus = status.CheckCount < 3 ? '正在监控' : '已通知';
-        }
-
-        row.innerHTML = `
-            <td>${status.Domain}</td>
-            <td>${registeredStatus}</td>
-            <td>${lastCheckedTime}</td>
-            <td>${monitorStatus}</td>
-        `;
-        statusTableBody.appendChild(row);
-    });
-}
-// 添加这个函数来定期刷新状态
-function startStatusRefresh() {
-    setInterval(() => {
-        fetch('/domain-statuses')
-            .then(response => response.json())
-            .then(statuses => {
-                updateDomainStatusList(statuses);
-            })
-            .catch(error => console.error('Error:', error));
-    }, 30000); // 每30秒刷新一次
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     // 域名管理
     const addDomainForm = document.getElementById('add-domain-form');
@@ -90,7 +49,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (window.location.pathname === '/' || window.location.pathname === '/domains') {
         loadDomains();
-        loadDomainStatuses();
     } else if (window.location.pathname === '/whois-servers') {
         loadWhoisServers();
     }
@@ -324,26 +282,47 @@ function updateDomainStatusList(statuses) {
     statusTableBody.innerHTML = '';
     statuses.forEach(status => {
         const row = document.createElement('tr');
-        let registeredStatus, lastCheckedTime, monitorStatus;
+        let statusText, lastCheckedTime, monitorStatus;
 
         if (new Date(status.LastChecked).getFullYear() === 1) {
-            registeredStatus = '未查询';
+            statusText = '未查询';
             lastCheckedTime = '/';
             monitorStatus = '等待监控';
         } else {
-            registeredStatus = status.Registered ? '已注册' : '<span class="text-green-500">未注册</span>';
+            // 使用 if-else 链来确定状态，确保只有一个状态被选中
+            if (status.PendingDelete) {
+                statusText = '<span class="text-red-500">待删除</span>';
+            } else if (status.Redemption) {
+                statusText = '<span class="text-orange-500">赎回期</span>';
+            } else if (status.Registered) {
+                statusText = '已注册';
+            } else {
+                statusText = '<span class="text-green-500">可注册</span>';
+            }
             lastCheckedTime = new Date(status.LastChecked).toLocaleString();
             monitorStatus = status.CheckCount < 3 ? '正在监控' : '已通知';
         }
 
         row.innerHTML = `
             <td>${status.Domain}</td>
-            <td>${registeredStatus}</td>
+            <td>${statusText}</td>
             <td>${lastCheckedTime}</td>
-            <td >${monitorStatus}</td>
+            <td>${monitorStatus}</td>
         `;
         statusTableBody.appendChild(row);
     });
+}
+
+// 添加这个函数来定期刷新状态
+function startStatusRefresh() {
+    setInterval(() => {
+        fetch('/domain-statuses')
+            .then(response => response.json())
+            .then(statuses => {
+                updateDomainStatusList(statuses);
+            })
+            .catch(error => console.error('Error:', error));
+    }, 30000); // 每30秒刷新一次
 }
 
 function sortStatuses(column) {
