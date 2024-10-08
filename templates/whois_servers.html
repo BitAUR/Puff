@@ -1,7 +1,6 @@
 {{define "whois_servers_content"}}
 <div class="space-y-8"> <!-- 增加整体垂直间距 -->
     <h1 class="text-3xl font-bold text-center">Whois 服务器管理</h1>
-
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8"> <!-- 增加列间距 -->
         <div class="flex flex-col justify-center space-y-4"> <!-- 增加垂直间距 -->
             <h2 class="text-2xl font-semibold">添加 Whois 服务器</h2>
@@ -12,6 +11,7 @@
                 <div class="form-control">
                     <input type="text" id="new-server" class="input input-bordered w-full" placeholder="输入 Whois 服务器地址" required>
                 </div>
+                <button onclick="window.open('https://roy.wang/whois', '_blank', 'noopener')" class="btn w-full">参考列表</button>
                 <button type="submit" class="btn w-full">添加</button>
             </form>
         </div>

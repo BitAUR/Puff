@@ -5,11 +5,16 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8"> <!-- 增加列间距 -->
         <div class="flex flex-col justify-center space-y-4"> <!-- 修改这里 -->
             <h2 class="text-2xl font-semibold">添加域名</h2>
-            <form id="add-domain-form" class="w-full">
+            {{if .error}}
+            <div class="alert alert-error mb-4">
+                <span>{{.error}}</span>
+            </div>
+            {{end}}
+            <form id="add-domain-form" class="space-y-4">
                 <div class="join w-full flex flex-col sm:flex-row">
-                    <input type="text" id="new-domain" class="input input-bordered join-item flex-grow" placeholder="输入域名" required>
-                    <button type="submit" class="btn join-item mt-2 sm:mt-0">添加</button>
+                    <input type="text" id="new-domain" class="input input-bordered flex-grow" placeholder="输入域名" required>
                 </div>
+                <button type="submit" class="btn w-full">添加</button>
             </form>
         </div>
         <div class="flex flex-col justify-center space-y-4"> <!-- 增加垂直间距 -->

@@ -38,7 +38,6 @@ func StartServer() error {
 	r.GET("/login", handleLogin)
 	r.POST("/login", auth.LoginHandler)
 	r.GET("/logout", auth.LogoutHandler)
-
 	// 受保护的路由
 	authorized := r.Group("/")
 	authorized.Use(auth.AuthMiddleware())
@@ -64,6 +63,8 @@ func StartServer() error {
 		authorized.POST("/settings", handleUpdateSettings)
 		authorized.GET("/api/settings", handleAPISettings)
 		authorized.POST("/api/settings", handleAPISettings)
+		authorized.GET("/api/check-update", handleCheckUpdate)
+		authorized.POST("/api/test-email", handleTestEmail)
 	}
 
 	return r.Run(":" + strconv.Itoa(cfg.WebPort))

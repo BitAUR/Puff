@@ -31,6 +31,7 @@
                     <li><a href="/domains">域名管理</a></li>
                     <li><a href="/whois-servers">Whois 服务器</a></li>
                     <li><a href="/settings">系统设置</a></li>
+                    <li><a target="_blank" rel="noopener" href="https://qm.qq.com/q/KiZKTTruK">反馈</a></li>
                     <li><a href="/logout">登出</a></li>
                 </ul>
             </div>
@@ -38,10 +39,11 @@
         </div>
         <div class="navbar-center hidden lg:flex">
             <ul class="menu menu-horizontal px-1">
-                <li><a href="/domains">域名管理</a></li>
-                <li><a href="/whois-servers">Whois 服务器</a></li>
-                <li><a href="/settings">系统设置</a></li>
-                <li><a href="/logout">登出</a></li>
+                <li><a class="btn btn-ghost" href="/domains">域名管理</a></li>
+                <li><a class="btn btn-ghost" href="/whois-servers">Whois 服务器</a></li>
+                <li><a class="btn btn-ghost" href="/settings">系统设置</a></li>
+                <li><a target="_blank" rel="noopener" class="btn btn-ghost" href="https://qm.qq.com/q/KiZKTTruK">反馈</a></li>
+                <li><a class="btn btn-ghost" href="/logout">登出</a></li>
             </ul>
         </div>
         <div class="navbar-end">
@@ -66,7 +68,9 @@
             {{end}}
         </div>
     </div>
-
-    <script src="/static/js/main.js"></script>
 </body>
+<footer class="fixed bottom-0 left-0 right-0 text-center p-2">
+    <p style="color:#6b7280;font-size: 13px;"><span id="current-version"></span></p>
+</footer>
+<script src="/static/js/main.js"></script>
 </html>

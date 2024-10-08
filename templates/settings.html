@@ -1,23 +1,10 @@
 {{define "settings_content"}}
 <div class="space-y-8">
     <h1 class="text-3xl font-bold text-center">系统设置</h1>
-
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h2 class="card-title">编辑配置</h2>
-            <div class="form-control w-full max-w-xs mb-4">
-                <label class="label">
-                    <span class="label-text">选择设置类别</span>
-                </label>
-                <select id="settings-category" class="select select-bordered">
-                    <option value="email">邮件设置</option>
-                    <option value="web">Web 设置</option>
-                    <option value="auth">认证设置</option>
-                    <option value="other">其他设置</option>
-                </select>
-            </div>
-            <form id="settings-form">
-                <div id="email-settings" class="settings-section space-y-4">
+            <form id="settings-form" class="space-y-8">
+                <div class="space-y-4">
                     <h3 class="text-lg font-semibold">邮件设置</h3>
                     <div class="form-control">
                         <label class="label">
@@ -49,8 +36,10 @@
                         </label>
                         <input type="password" name="SMTP_PASSWORD" class="input input-bordered" value="{{.config.SMTPPassword}}" required>
                     </div>
+                    <button type="button" id="test-email-btn" class="btn">测试邮件发送</button>
                 </div>
-                <div id="web-settings" class="settings-section space-y-4 hidden">
+
+                <div class="space-y-4">
                     <h3 class="text-lg font-semibold">Web 设置</h3>
                     <div class="form-control">
                         <label class="label">
@@ -59,7 +48,8 @@
                         <input type="number" name="WEB_PORT" class="input input-bordered" value="{{.config.WebPort}}" required>
                     </div>
                 </div>
-                <div id="auth-settings" class="settings-section space-y-4 hidden">
+
+                <div class="space-y-4">
                     <h3 class="text-lg font-semibold">认证设置</h3>
                     <div class="form-control">
                         <label class="label">
@@ -74,7 +64,8 @@
                         <input type="password" name="AUTH_PASSWORD" class="input input-bordered" value="{{.config.AuthPassword}}" required>
                     </div>
                 </div>
-                <div id="other-settings" class="settings-section space-y-4 hidden">
+
+                <div class="space-y-4">
                     <h3 class="text-lg font-semibold">其他设置</h3>
                     <div class="form-control">
                         <label class="label">
@@ -89,8 +80,9 @@
                         <input type="text" name="SESSION_SECRET" class="input input-bordered" value="{{.config.SessionSecret}}" required>
                     </div>
                 </div>
+
                 <div class="mt-6">
-                    <button type="submit" class="btn btn-primary">保存设置</button>
+                    <button type="submit" class="btn">保存设置</button>
                 </div>
             </form>
         </div>
@@ -98,14 +90,25 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const categorySelect = document.getElementById('settings-category');
-    const settingsSections = document.querySelectorAll('.settings-section');
-
-    categorySelect.addEventListener('change', function() {
-        settingsSections.forEach(section => section.classList.add('hidden'));
-        document.getElementById(`${this.value}-settings`).classList.remove('hidden');
+    document.getElementById('test-email-btn').addEventListener('click', function(e) {
+        e.preventDefault();
+        fetch('/api/test-email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('测试邮件发送成功!');
+            } else {
+                alert('测试邮件发送失败!');
+            }
+        })
+        .catch(error => {
+            alert('发送请求时出错：' + error);
+        });
     });
-});
-</script>
+    </script>
 {{end}}

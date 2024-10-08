@@ -2,7 +2,9 @@ package notifier
 
 import (
 	"Puff/internal/config"
+	"crypto/tls"
 	"fmt"
+	"log"
 	"net/smtp"
 	"strings"
 	"time"
@@ -15,10 +17,16 @@ type DomainNotification struct {
 }
 
 func SendNotification(notifications []DomainNotification, cfg *config.Config) error {
+	log.Printf("开始发送邮件通知")
+
 	auth := smtp.PlainAuth("", cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPServer)
 
 	to := []string{cfg.RecipientEmail}
 	subject := "域名状态变更提醒"
+
+	if len(notifications) == 1 && notifications[0].Domain == "example.com" {
+		subject = "测试邮件 - " + subject
+	}
 
 	body := generateEmailBody(notifications)
 
@@ -30,12 +38,56 @@ func SendNotification(notifications []DomainNotification, cfg *config.Config) er
 		"\r\n"+
 		"%s\r\n", cfg.SMTPUsername, cfg.RecipientEmail, subject, body))
 
-	err := smtp.SendMail(fmt.Sprintf("%s:%d", cfg.SMTPServer, cfg.SMTPPort), auth, cfg.SMTPUsername, to, msg)
-	if err != nil {
-		return fmt.Errorf("发送邮件失败: %v\n服务器: %s:%d\n发件人: %s\n收件人: %s",
-			err, cfg.SMTPServer, cfg.SMTPPort, cfg.SMTPUsername, cfg.RecipientEmail)
+	// 创建TLS配置
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+		ServerName:         cfg.SMTPServer,
 	}
 
+	// 连接到SMTP服务器
+	conn, err := smtp.Dial(fmt.Sprintf("%s:%d", cfg.SMTPServer, cfg.SMTPPort))
+	if err != nil {
+		return fmt.Errorf("连接到SMTP服务器失败: %v", err)
+	}
+	defer conn.Close()
+
+	// 尝试启用TLS
+	if err = conn.StartTLS(tlsConfig); err != nil {
+		return fmt.Errorf("启用TLS失败: %v", err)
+	}
+
+	// 进行身份验证
+	if err = conn.Auth(auth); err != nil {
+		return fmt.Errorf("SMTP身份验证失败: %v", err)
+	}
+
+	// 设置发件人
+	if err = conn.Mail(cfg.SMTPUsername); err != nil {
+		return fmt.Errorf("设置发件人失败: %v", err)
+	}
+
+	// 设置收件人
+	for _, addr := range to {
+		if err = conn.Rcpt(addr); err != nil {
+			return fmt.Errorf("设置收件人失败: %v", err)
+		}
+	}
+
+	// 发送邮件内容
+	w, err := conn.Data()
+	if err != nil {
+		return fmt.Errorf("准备发送邮件内容失败: %v", err)
+	}
+	_, err = w.Write(msg)
+	if err != nil {
+		return fmt.Errorf("写入邮件内容失败: %v", err)
+	}
+	err = w.Close()
+	if err != nil {
+		return fmt.Errorf("完成邮件内容写入失败: %v", err)
+	}
+
+	log.Println("邮件发送成功")
 	return nil
 }
 
@@ -50,7 +102,7 @@ func generateEmailBody(notifications []DomainNotification) string {
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { width: 100%; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #4CAF50; color: white; padding: 10px; text-align: center; }
+        .header { background-color: #161616; color: white; padding: 10px; text-align: center; }
         .content { padding: 20px; background-color: #f9f9f9; }
         .footer { text-align: center; font-size: 0.8em; color: #777; margin-top: 20px; }
     </style>

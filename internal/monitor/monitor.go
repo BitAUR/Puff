@@ -4,6 +4,7 @@ import (
 	"Puff/internal/config"
 	"Puff/internal/notifier"
 	"Puff/internal/whois"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -87,8 +88,37 @@ func updateDomainStatus(domain string, registered bool) {
 		availableDomains = append(availableDomains, domain)
 	}
 }
-
 func StartMonitoring(whoisServers map[string]string, cfg *config.Config) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	stopChan = make(chan struct{})
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(time.Duration(cfg.QueryFrequencySeconds) * time.Second)
+		defer ticker.Stop()
+
+		// 立即执行一次检查
+		performCheck(whoisServers, cfg)
+
+		for {
+			select {
+			case <-ticker.C:
+				log.Println("定时器触发。开始检查域名。")
+				performCheck(whoisServers, cfg)
+			case <-stopChan:
+				log.Println("收到停止信号，域名监控退出")
+				return
+			}
+		}
+	}()
+
+	log.Println("域名监控已启动并运行中")
+}
+
+func performCheck(whoisServers map[string]string, cfg *config.Config) {
 	startTime := time.Now()
 	log.Printf("开始域名检查，时间：%s", startTime.Format("2006-01-02 15:04:05"))
 
@@ -105,10 +135,16 @@ func StartMonitoring(whoisServers map[string]string, cfg *config.Config) {
 	log.Printf("域名检查完成，时间：%s，耗时：%v", endTime.Format("2006-01-02 15:04:05"), duration)
 }
 
-func WaitForMonitoring() {
-	wg.Wait()
-}
+func StopMonitoring() {
+	mu.Lock()
+	defer mu.Unlock()
 
+	if stopChan != nil {
+		close(stopChan)
+		wg.Wait()
+		stopChan = nil
+	}
+}
 func checkAllDomains(cfg *config.Config) {
 	startTime := time.Now()
 	log.Printf("开始域名检查，时间：%s", startTime.Format("2006-01-02 15:04:05"))
@@ -220,32 +256,46 @@ func processResults(results <-chan whois.DomainStatus, cfg *config.Config) {
 		status.ExpirationDate = result.ExpirationDate
 		status.LastChecked = time.Now()
 
-		statusChanged := !status.Registered || status.Redemption || status.PendingDelete
+		// 检查状态变化
+		statusChanged := (prevStatus.Registered != status.Registered) ||
+			(prevStatus.Redemption != status.Redemption) ||
+			(prevStatus.PendingDelete != status.PendingDelete)
 
-		if statusChanged {
+		if !status.Registered {
 			if status.FirstNotifiedAt.IsZero() {
+				// 首次检测到未注册状态
 				status.FirstNotifiedAt = time.Now()
 				status.CheckCount = 1
 				status.NeedsNotification = true
-				log.Printf("域名 %s 状态首次变化，将发送第一次通知", status.Domain)
+				log.Printf("域名 %s 首次检测为未注册，将发送第一次通知", status.Domain)
 			} else {
 				status.CheckCount++
-				log.Printf("域名 %s 状态变化次数: %d", status.Domain, status.CheckCount)
+				log.Printf("域名 %s 未注册状态检查次数: %d", status.Domain, status.CheckCount)
 				if status.CheckCount == 3 {
 					status.NeedsNotification = true
 					status.IsFinalNotice = true
-					log.Printf("域名 %s 将发送最终通知", status.Domain)
+					status.FinalNoticed = true
+					log.Printf("域名 %s 将发送最终通知并停止监控", status.Domain)
 				} else {
 					status.NeedsNotification = false
 				}
 			}
-		} else if prevStatus.Registered != status.Registered ||
-			prevStatus.Redemption != status.Redemption ||
-			prevStatus.PendingDelete != status.PendingDelete {
+		} else if status.Redemption || status.PendingDelete {
+			if statusChanged || status.FirstNotifiedAt.IsZero() {
+				// 状态变为赎回期或待删除，或首次检测到这些状态
+				status.FirstNotifiedAt = time.Now()
+				status.NeedsNotification = true
+				log.Printf("域名 %s 进入%s，将发送通知", status.Domain, getDomainStatusString(status))
+			} else {
+				status.NeedsNotification = false
+			}
+		} else {
+			// 域名恢复为正常注册状态，重置所有标志
 			status.NeedsNotification = false
 			status.IsFinalNotice = false
 			status.FirstNotifiedAt = time.Time{}
 			status.CheckCount = 0
+			status.FinalNoticed = false
 		}
 
 		if status.NeedsNotification {
@@ -259,6 +309,7 @@ func processResults(results <-chan whois.DomainStatus, cfg *config.Config) {
 		statusMutex.Unlock()
 	}
 
+	// 发送通知的代码保持不变
 	if len(notifications) > 0 {
 		if err := notifier.SendNotification(notifications, cfg); err != nil {
 			log.Printf("发送邮件错误: %v", err)
@@ -272,8 +323,7 @@ func checkDomain(domain string, whoisServers map[string]string, cfg *config.Conf
 	tld := whois.GetTLD(domain)
 	whoisServer, ok := whoisServers[tld]
 	if !ok {
-		log.Printf("未找到域名 %s 的 Whois 服务器", domain)
-		return whois.DomainStatus{}, nil
+		return whois.DomainStatus{}, fmt.Errorf("未找到 %s 的Whois服务器", tld)
 	}
 
 	status, err := whois.QueryDomain(domain, whoisServer)

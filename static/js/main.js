@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    checkForUpdates();
 
         const settingsForm = document.getElementById('settings-form');
     if (settingsForm) {
@@ -206,36 +207,6 @@ function loadDomainStatuses() {
             updateDomainStatusList(statuses);
         })
         .catch(error => console.error('Error:', error));
-}
-
-function updateDomainStatusList(statuses) {
-    const statusTableBody = document.getElementById('status-table-body');
-    if (!statusTableBody) return;
-
-    statusTableBody.innerHTML = '';
-    statuses.forEach(status => {
-        const row = document.createElement('tr');
-        let registeredStatus, lastCheckedTime, monitorStatus;
-
-        if (new Date(status.LastChecked).getFullYear() === 1) {
-            // 处理新添加的域名
-            registeredStatus = '未查询';
-            lastCheckedTime = '/';
-            monitorStatus = '等待监控';
-        } else {
-            registeredStatus = status.Registered ? '已注册' : '可注册';
-            lastCheckedTime = new Date(status.LastChecked).toLocaleString();
-            monitorStatus = status.CheckCount < 3 ? '正在监控' : '已通知';
-        }
-
-        row.innerHTML = `
-            <td>${status.Domain}</td>
-            <td>${registeredStatus}</td>
-            <td>${lastCheckedTime}</td>
-            <td>${monitorStatus}</td>
-        `;
-        statusTableBody.appendChild(row);
-    });
 }
 function refreshDomainStatuses() {
     const button = document.getElementById('refresh-status-btn');
@@ -473,5 +444,69 @@ function forceRefreshSettings() {
     .catch(error => {
         console.error('Error loading settings:', error);
         alert('加载设置时出错: ' + error.message);
+    });
+}
+
+function checkForUpdates() {
+    fetch('/api/check-update')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('current-version').textContent = data.currentVersion;
+            
+            if (data.updateAvailable) {
+                showUpdateModal(data.latestVersion, data.publishedAt);
+            }
+        })
+        .catch(error => console.error('检查更新时出错:', error));
+}
+
+function checkForUpdates() {
+    fetch('/api/check-update')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('current-version').textContent = data.currentVersion;
+            
+            if (data.updateAvailable) {
+                showUpdateModal(data.latestVersion, data.publishedAt);
+            }
+        })
+        .catch(error => console.error('检查更新时出错:', error));
+}
+
+function showUpdateModal(latestVersion, publishedAt) {
+    const modal = document.createElement('div');
+    modal.innerHTML = `
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" id="update-modal">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">新版本可用</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500">
+                            有新版本 (${latestVersion}) 可用。
+                            发布时间：${new Date(publishedAt).toLocaleString()}
+                        </p>
+                    </div>
+                    <div class="items-center px-4 py-3 space-y-2">
+                        <button id="view-github" class="btn w-full">
+                            查看 GitHub 页面
+                        </button>
+                        <button id="close-modal" class="btn w-full">
+                            关闭
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // 使用事件委托来处理按钮点击
+    document.body.addEventListener('click', function(e) {
+        if (e.target.id === 'view-github') {
+            window.open(`https://github.com/bitaur/puff/releases/tag/${latestVersion}`, '_blank');
+        } else if (e.target.id === 'close-modal') {
+            document.body.removeChild(modal);
+        }
     });
 }

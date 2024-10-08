@@ -5,6 +5,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 type DomainStatus struct {
@@ -14,6 +16,7 @@ type DomainStatus struct {
 	Redemption     bool
 	PendingDelete  bool
 	ExpirationDate time.Time
+	NoWhoisServer  bool
 }
 
 func QueryDomain(domain, whoisServer string) (DomainStatus, error) {
@@ -47,7 +50,7 @@ func QueryDomain(domain, whoisServer string) (DomainStatus, error) {
 	return status, nil
 }
 
-// 保留原有的函数
+// 未注册
 func notRegisteredPhrases() []string {
 	return []string{
 		"no match",
@@ -61,7 +64,7 @@ func notRegisteredPhrases() []string {
 	}
 }
 
-// 新增函数
+// 赎回期
 func redemptionPhrases() []string {
 	return []string{
 		"redemption period",
@@ -70,7 +73,7 @@ func redemptionPhrases() []string {
 	}
 }
 
-// 新增函数
+// 正在删除
 func pendingDeletePhrases() []string {
 	return []string{
 		"pending delete",
@@ -89,6 +92,14 @@ func containsAny(s string, substrings []string) bool {
 }
 
 func GetTLD(domain string) string {
-	parts := strings.Split(domain, ".")
-	return parts[len(parts)-1]
+	// 使用 publicsuffix 库获取有效的顶级域名
+	suffix, _ := publicsuffix.PublicSuffix(domain)
+
+	// 如果无法获取有效的顶级域名，则回退到原来的逻辑
+	if suffix == "" {
+		parts := strings.Split(domain, ".")
+		return parts[len(parts)-1]
+	}
+
+	return suffix
 }

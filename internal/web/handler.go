@@ -3,10 +3,13 @@ package web
 import (
 	"Puff/internal/config"
 	"Puff/internal/monitor"
+	"Puff/internal/notifier"
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,7 +18,7 @@ func handleIndex(c *gin.Context) {
 	domains, err := config.LoadDomainList()
 	if err != nil {
 		log.Printf("加载域名错误: %v", err)
-		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -287,14 +290,16 @@ func handleAPISettings(c *gin.Context) {
 	} else if c.Request.Method == "POST" {
 		var newConfig config.Config
 		if err := c.ShouldBindJSON(&newConfig); err != nil {
-			log.Printf("绑定请求时出错: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.HTML(http.StatusUnauthorized, "layout.html", gin.H{
+				"error": "绑定请求时出错:" + err.Error(),
+			})
 			return
 		}
 
 		if err := config.SaveConfig(&newConfig); err != nil {
-			log.Printf("保存配置时出错: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.HTML(http.StatusUnauthorized, "layout.html", gin.H{
+				"error": "保存配置时出错:" + err.Error(),
+			})
 			return
 		}
 
@@ -304,7 +309,7 @@ func handleAPISettings(c *gin.Context) {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("监控重启时出现恐慌: %v", r)
+					log.Printf("监控重启时出现错误: %v", r)
 				}
 			}()
 			whoisServers, err := config.LoadWhoisServers()
@@ -322,4 +327,58 @@ func handleAPISettings(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "不允许的方法"})
 	}
+}
+
+func handleTestEmail(c *gin.Context) {
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "加载配置失败: " + err.Error()})
+		return
+	}
+
+	testNotification := []notifier.DomainNotification{
+		{
+			Domain:        "example.com",
+			IsFinalNotice: false,
+			Status:        "测试状态",
+		},
+	}
+
+	err = notifier.SendNotification(testNotification, cfg)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "发送测试邮件失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "测试邮件发送成功"})
+}
+
+type GithubRelease struct {
+	TagName     string    `json:"tag_name"`
+	PublishedAt time.Time `json:"published_at"`
+}
+
+func handleCheckUpdate(c *gin.Context) {
+	currentVersion := "v0.2.1" // 当前版本
+
+	// 获取 GitHub 最新 release
+	resp, err := http.Get("https://api.github.com/repos/bitaur/puff/releases/latest")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法检查更新"})
+		return
+	}
+	defer resp.Body.Close()
+
+	var release GithubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "解析更新信息失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"currentVersion":  currentVersion,
+		"latestVersion":   release.TagName,
+		"publishedAt":     release.PublishedAt,
+		"updateAvailable": release.TagName != currentVersion,
+	})
 }

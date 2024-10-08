@@ -1,7 +1,7 @@
 <div align="center">
     <h1>Puff</h1>
 <div align="center">
-    
+
 ![GitHub repo size](https://img.shields.io/github/repo-size/bitaur/puff)
 ![GitHub Repo stars](https://img.shields.io/github/stars/bitaur/puff)
 ![GitHub all releases](https://img.shields.io/github/downloads/bitaur/puff/total)
@@ -164,7 +164,7 @@ docker rm ID
 docker pull bitaur/puff:latest
 
 # 输入安装命令
-docker run -d --restart=unless-stopped -v /data/puff:/data -p 9740:9740 --name="Puff" bitaur/puff:latest
+docker run -d --restart=unless-stopped -v /data/puff:/data -p 8080:8080 --name="Puff" bitaur/puff:latest
 ```
 
 #### Docker Compose

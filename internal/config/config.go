@@ -323,9 +323,7 @@ func GetConfigPath(filename string) string {
 }
 
 func SaveConfig(cfg *Config) error {
-	log.Println("开始保存配置...")
 	envPath := getConfigPath(".env")
-	log.Printf("环境文件路径: %s", envPath)
 
 	env, err := godotenv.Read(envPath)
 	if err != nil {
@@ -337,8 +335,6 @@ func SaveConfig(cfg *Config) error {
 			return fmt.Errorf("error reading .env file: %w", err)
 		}
 	}
-
-	log.Printf("当前环境变量内容: %+v", env)
 
 	// 辅助函数，只在新值非空时更新
 	updateEnv := func(key string, value string) {
@@ -365,8 +361,6 @@ func SaveConfig(cfg *Config) error {
 	if cfg.QueryFrequencySeconds != 0 {
 		env["QUERY_FREQUENCY_SECONDS"] = strconv.Itoa(cfg.QueryFrequencySeconds)
 	}
-
-	log.Printf("更新后准备写入的环境变量: %+v", env)
 
 	if err := godotenv.Write(env, envPath); err != nil {
 		log.Printf("写入 .env 文件时出错: %v", err)
