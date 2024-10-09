@@ -1,7 +1,6 @@
 package whois
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -18,7 +17,6 @@ type DomainStatus struct {
 	PendingDelete  bool
 	ExpirationDate time.Time
 	NoWhoisServer  bool
-	RawWhois       string // 新增字段，存储原始 WHOIS 响应
 }
 
 func QueryDomain(domain, whoisServer string) (DomainStatus, error) {
@@ -37,50 +35,17 @@ func QueryDomain(domain, whoisServer string) (DomainStatus, error) {
 	responseLower := strings.ToLower(responseStr)
 
 	status := DomainStatus{
-		Domain:   domain,
-		RawWhois: responseStr, // 存储原始 WHOIS 响应
+		Domain: domain,
 	}
 
-	// 特殊处理 .cc 域名
-	if strings.HasSuffix(domain, ".cc") {
-		return handleCCDomain(responseLower, domain, responseStr)
-	}
-
-	// 检查域名是否处于待删除状态
-	status.PendingDelete = containsAny(responseLower, pendingDeletePhrases())
+	// 检查域名是否注册
+	status.Registered = !containsAny(responseLower, notRegisteredPhrases())
 
 	// 检查域名是否处于赎回期
 	status.Redemption = containsAny(responseLower, redemptionPhrases())
 
-	// 检查域名是否注册
-	status.Registered = !containsAny(responseLower, notRegisteredPhrases()) || status.PendingDelete || status.Redemption
-
-	// 输出查询到的 WHOIS 信息
-	fmt.Printf("Domain: %s\nWHOIS Response:\n%s\n", domain, responseStr)
-
-	return status, nil
-}
-
-func handleCCDomain(response, domain, rawWhois string) (DomainStatus, error) {
-	status := DomainStatus{
-		Domain:   domain,
-		RawWhois: rawWhois, // 存储原始 WHOIS 响应
-	}
-
-	if strings.Contains(response, "no match") {
-		// 域名未注册
-		status.Registered = false
-	} else if strings.Contains(response, "pendingdelete") {
-		// 域名处于待删除状态，但仍然视为已注册
-		status.Registered = true
-		status.PendingDelete = true
-	} else {
-		// 其他情况视为已注册
-		status.Registered = true
-	}
-
-	// 输出查询到的 WHOIS 信息
-	fmt.Printf("Domain: %s\nWHOIS Response:\n%s\n", domain, rawWhois)
+	// 检查域名是否处于待删除状态
+	status.PendingDelete = containsAny(responseLower, pendingDeletePhrases())
 
 	return status, nil
 }
@@ -114,7 +79,6 @@ func pendingDeletePhrases() []string {
 		"pending delete",
 		"pendingdelete",
 		"status: pending delete",
-		"ICANN ",
 	}
 }
 
