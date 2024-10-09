@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
+	"net"
 	"net/smtp"
 	"strings"
 	"time"
@@ -19,15 +20,9 @@ type DomainNotification struct {
 func SendNotification(notifications []DomainNotification, cfg *config.Config) error {
 	log.Printf("开始发送邮件通知")
 
-	auth := smtp.PlainAuth("", cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPServer)
-
+	// 创建邮件内容
 	to := []string{cfg.RecipientEmail}
 	subject := "域名状态变更提醒"
-
-	if len(notifications) == 1 && notifications[0].Domain == "example.com" {
-		subject = "测试邮件 - " + subject
-	}
-
 	body := generateEmailBody(notifications)
 
 	msg := []byte(fmt.Sprintf("From: %s\r\n"+
@@ -38,56 +33,101 @@ func SendNotification(notifications []DomainNotification, cfg *config.Config) er
 		"\r\n"+
 		"%s\r\n", cfg.SMTPUsername, cfg.RecipientEmail, subject, body))
 
-	// 创建TLS配置
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
-		ServerName:         cfg.SMTPServer,
+	// 根据端口选择不同的发送方式
+	var err error
+	switch cfg.SMTPPort {
+	case 25:
+		err = sendMailInsecure(cfg, to, msg)
+	case 465:
+		err = sendMailSSL(cfg, to, msg)
+	default: // 包括 587 端口
+		err = sendMailTLS(cfg, to, msg)
 	}
 
-	// 连接到SMTP服务器
-	conn, err := smtp.Dial(fmt.Sprintf("%s:%d", cfg.SMTPServer, cfg.SMTPPort))
 	if err != nil {
-		return fmt.Errorf("连接到SMTP服务器失败: %v", err)
-	}
-	defer conn.Close()
-
-	// 尝试启用TLS
-	if err = conn.StartTLS(tlsConfig); err != nil {
-		return fmt.Errorf("启用TLS失败: %v", err)
-	}
-
-	// 进行身份验证
-	if err = conn.Auth(auth); err != nil {
-		return fmt.Errorf("SMTP身份验证失败: %v", err)
-	}
-
-	// 设置发件人
-	if err = conn.Mail(cfg.SMTPUsername); err != nil {
-		return fmt.Errorf("设置发件人失败: %v", err)
-	}
-
-	// 设置收件人
-	for _, addr := range to {
-		if err = conn.Rcpt(addr); err != nil {
-			return fmt.Errorf("设置收件人失败: %v", err)
-		}
-	}
-
-	// 发送邮件内容
-	w, err := conn.Data()
-	if err != nil {
-		return fmt.Errorf("准备发送邮件内容失败: %v", err)
-	}
-	_, err = w.Write(msg)
-	if err != nil {
-		return fmt.Errorf("写入邮件内容失败: %v", err)
-	}
-	err = w.Close()
-	if err != nil {
-		return fmt.Errorf("完成邮件内容写入失败: %v", err)
+		return fmt.Errorf("发送邮件失败: %v", err)
 	}
 
 	log.Println("邮件发送成功")
+	return nil
+}
+
+func sendMailInsecure(cfg *config.Config, to []string, msg []byte) error {
+	return smtp.SendMail(
+		fmt.Sprintf("%s:%d", cfg.SMTPServer, cfg.SMTPPort),
+		nil,
+		cfg.SMTPUsername,
+		to,
+		msg,
+	)
+}
+
+func sendMailSSL(cfg *config.Config, to []string, msg []byte) error {
+	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", cfg.SMTPServer, cfg.SMTPPort), &tls.Config{
+		ServerName: cfg.SMTPServer,
+	})
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	c, err := smtp.NewClient(conn, cfg.SMTPServer)
+	if err != nil {
+		return err
+	}
+	defer c.Quit()
+
+	return sendMail(c, cfg, to, msg)
+}
+
+func sendMailTLS(cfg *config.Config, to []string, msg []byte) error {
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", cfg.SMTPServer, cfg.SMTPPort))
+	if err != nil {
+		return err
+	}
+
+	c, err := smtp.NewClient(conn, cfg.SMTPServer)
+	if err != nil {
+		return err
+	}
+	defer c.Quit()
+
+	if err = c.StartTLS(&tls.Config{ServerName: cfg.SMTPServer}); err != nil {
+		return err
+	}
+
+	return sendMail(c, cfg, to, msg)
+}
+
+func sendMail(c *smtp.Client, cfg *config.Config, to []string, msg []byte) error {
+	auth := smtp.PlainAuth("", cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPServer)
+	if err := c.Auth(auth); err != nil {
+		return err
+	}
+
+	if err := c.Mail(cfg.SMTPUsername); err != nil {
+		return err
+	}
+
+	for _, addr := range to {
+		if err := c.Rcpt(addr); err != nil {
+			return err
+		}
+	}
+
+	w, err := c.Data()
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(msg)
+	if err != nil {
+		return err
+	}
+	err = w.Close()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

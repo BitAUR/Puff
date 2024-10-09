@@ -359,10 +359,10 @@ type GithubRelease struct {
 }
 
 func handleCheckUpdate(c *gin.Context) {
-	currentVersion := "v0.2.1" // 当前版本
+	currentVersion := "v0.2.2" // 当前版本
 
 	// 获取 GitHub 最新 release
-	resp, err := http.Get("https://api.github.com/repos/bitaur/puff/releases/latest")
+	resp, err := http.Get("https://api.bitaur.com/puff/version")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法检查更新"})
 		return
