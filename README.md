@@ -125,7 +125,7 @@ WantedBy=multi-user.target
 ### Docker CLI
 
 ``` shell
-docker run -d --restart=unless-stopped -v /data/puff:/data -p 8080:8080 --name="Puff" bitaur/puff:latest
+docker run -d --restart=unless-stopped -v /data/puff:/app/data -p 8080:8080 --name="Puff" bitaur/puff:latest
 ```
 
 ### Docker Compose
@@ -138,7 +138,7 @@ services:
     image: bitaur/puff:latest
     container_name: Puff
     volumes:
-      - /data/puff:/data
+      - /data/puff:/app/data
     restart: unless-stopped
     ports:
       - 8080:8080
@@ -164,7 +164,7 @@ docker rm ID
 docker pull bitaur/puff:latest
 
 # 输入安装命令
-docker run -d --restart=unless-stopped -v /data/puff:/data -p 8080:8080 --name="Puff" bitaur/puff:latest
+docker run -d --restart=unless-stopped -v /data/puff:/app/data -p 8080:8080 --name="Puff" bitaur/puff:latest
 ```
 
 #### Docker Compose
